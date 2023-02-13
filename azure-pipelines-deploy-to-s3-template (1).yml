@@ -1,0 +1,23 @@
+parameters:
+  - name: service_name
+    type: string
+  - name: environment
+    type: string
+  - name: awsCredentials
+    type: string
+
+steps:
+  - task: AWSShellScript@1
+    displayName: Deploy to S3
+    inputs:
+      awsCredentials: ${{ parameters.awsCredentials }}
+      regionName: ap-southeast-1
+      scriptType: inline
+      inlineScript: |
+        echo $AWS_ACCESS_KEY_ID
+        echo $AWS_SECRET_ACCESS_KEY
+        export ENV=${{ parameters.environment }}
+        pwd
+        ls -la
+        chmod +x ./deploy/scripts/deploy.sh
+        ./deploy/scripts/deploy.sh

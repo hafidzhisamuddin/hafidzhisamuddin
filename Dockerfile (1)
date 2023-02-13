@@ -1,0 +1,9 @@
+FROM openpet/awsm-rts-base:v1
+
+RUN mkdir -p app
+WORKDIR /app
+COPY . .
+EXPOSE 5050
+RUN pip3 install -r requirements.txt
+RUN chmod +x start.sh
+ENTRYPOINT [ "/app/start.sh" ]

@@ -1,0 +1,98 @@
+trigger:
+  branches:
+    include:
+      - hotfix/*
+      - master
+      - main
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  - name: is_master
+    value: $[or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.SourceBranch'], 'refs/heads/master'))]
+  - name: is_master_or_hotfix
+    value: $[or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix/'))]
+  - name: service_name
+    value: rts
+
+stages:
+  - stage: build
+    variables:
+      env: staging
+    jobs:
+      - job: Build
+        container:
+          image: python:3.8.12-bullseye
+        steps:
+          - script: python --version
+            displayName: "Confirm Python version"
+          - script: |
+              ls
+              python3 test_main.py
+            displayName: Running test
+
+  - stage: staging
+    variables:
+      - name: env
+        value: staging
+    dependsOn: [build]
+    condition: and(succeeded(), eq(variables.is_master, true))
+    jobs:
+      - deployment: staging
+        environment: RTSSTAGING
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: echo $(pwd)
+                  displayName: "Test script"
+                - template: azure-pipelines-deploy-to-s3-template.yml
+                  parameters:
+                    service_name: $(service_name)
+                    environment: $(env)
+                    awsCredentials: "pdb-awsm-cicd-staging"
+
+  - stage: uat
+    variables:
+      - name: env
+        value: uat
+    dependsOn: [staging]
+    condition: and(succeeded(), eq(variables.is_master, true))
+    jobs:
+      - deployment: uat
+        environment: RTSUAT
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: echo $(pwd)
+                  displayName: "Test script"
+                - template: azure-pipelines-deploy-to-s3-template.yml
+                  parameters:
+                    service_name: $(service_name)
+                    environment: $(env)
+                    awsCredentials: "pdb-awsm-cicd-staging"
+
+  - stage: prod
+    variables:
+      - name: env
+        value: prod
+    dependsOn: [uat]
+    condition: and(succeeded(), eq(variables.is_master, true))
+    jobs:
+      - deployment: prod
+        environment: RTSPROD
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: echo $(pwd)
+                  displayName: "Test script"
+                - template: azure-pipelines-deploy-to-s3-template.yml
+                  parameters:
+                    service_name: $(service_name)
+                    environment: $(env)
+                    awsCredentials: "pdb-awsm-cicd-prod"
